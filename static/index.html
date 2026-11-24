@@ -6,83 +6,189 @@
 <title>Heart disease risk estimator</title>
 <style>
   :root {
-    --paper: #f4f7f8; --ink: #14213d; --muted: #5b6b7c; --line: #d3dde3;
-    --card: #ffffff; --accent: #0b6e69; --low: #2f855a; --mid: #b7791f; --high: #c53030;
+    --base: #f2f8f7;
+    --ink: #11283a;
+    --muted: #5a6f7f;
+    --line: #d5e2e6;
+    --card: rgba(255, 255, 255, .86);
+    --accent: #0b6e69;
+    --accent-dark: #084f4b;
+    --pulse: #d64045;
+    --low: #2b8a5a;
+    --mid: #c27c12;
+    --high: #d64045;
+    --display: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+    --body: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--paper); color: var(--ink);
-         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
-  main { max-width: 980px; margin: 0 auto; padding: 32px 20px 56px; }
-  h1 { font: 700 2rem/1.2 Georgia, "Iowan Old Style", serif; margin: 0 0 6px; }
-  .lede { color: var(--muted); margin: 0 0 28px; max-width: 60ch; }
-  .layout { display: grid; grid-template-columns: 1.4fr 1fr; gap: 24px; align-items: start; }
-  @media (max-width: 800px) { .layout { grid-template-columns: 1fr; } }
-  form, .result { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 20px; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; color: var(--ink); font: 16px/1.55 var(--body);
+    min-height: 100vh;
+    background:
+      radial-gradient(900px 500px at 8% -5%, #d7efe9 0%, transparent 60%),
+      radial-gradient(800px 500px at 100% 0%, #dbe6f7 0%, transparent 55%),
+      linear-gradient(180deg, #f6fbfa 0%, var(--base) 100%);
+    background-attachment: fixed;
+  }
+  /* ECG graph paper: fine squares every 16px, bold lines every 80px, fading downwards */
+  body::before {
+    content: ""; position: fixed; inset: 0; z-index: -1; pointer-events: none;
+    background-image:
+      linear-gradient(rgba(214, 64, 69, .13) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(214, 64, 69, .13) 1px, transparent 1px),
+      linear-gradient(rgba(214, 64, 69, .06) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(214, 64, 69, .06) 1px, transparent 1px);
+    background-size: 80px 80px, 80px 80px, 16px 16px, 16px 16px;
+    -webkit-mask-image: linear-gradient(180deg, #000 0%, rgba(0, 0, 0, .55) 45%, transparent 100%);
+            mask-image: linear-gradient(180deg, #000 0%, rgba(0, 0, 0, .55) 45%, transparent 100%);
+  }
+  main { max-width: 1040px; margin: 0 auto; padding: 40px 20px 64px; }
+
+  /* ---- Hero ---- */
+  header { margin-bottom: 28px; }
+  h1 { font: 700 clamp(2rem, 5vw, 3rem)/1.1 var(--display); margin: 0 0 10px; letter-spacing: -.01em; }
+  .lede { color: var(--muted); margin: 0; max-width: 58ch; font-size: 1.05rem; }
+  .trace { display: block; width: 100%; height: 64px; margin-top: 18px; overflow: visible; }
+  .trace path { fill: none; stroke: var(--pulse); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round;
+                stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 2.4s ease-out .2s forwards; }
+  @keyframes draw { to { stroke-dashoffset: 0; } }
+
+  /* ---- Layout ---- */
+  .layout { display: grid; grid-template-columns: 1.45fr 1fr; gap: 24px; align-items: start; }
+  @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+  .panel {
+    background: var(--card); border: 1px solid var(--line); border-radius: 14px;
+    -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px);
+    box-shadow: 0 10px 30px -18px rgba(17, 40, 58, .35);
+  }
+  form.panel { padding: 8px 24px 24px; }
+  fieldset { border: 0; margin: 0; padding: 16px 0 6px; }
+  fieldset + fieldset { border-top: 1px solid var(--line); }
+  legend { font: 700 1.1rem var(--display); padding: 0; margin-bottom: 10px; float: left; width: 100%; }
+  legend + * { clear: both; }
   .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; }
-  @media (max-width: 480px) { .grid { grid-template-columns: 1fr; } }
+  @media (max-width: 520px) { .grid { grid-template-columns: 1fr; } }
   label { display: block; font-weight: 600; font-size: .9rem; }
-  label small { display: block; font-weight: 400; color: var(--muted); }
-  input, select { width: 100%; margin-top: 4px; padding: 8px 10px; font: inherit;
-                  border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink); }
-  input:focus-visible, select:focus-visible, button:focus-visible { outline: 3px solid #8ccfca; outline-offset: 1px; }
-  .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
-  button { font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 6px; cursor: pointer;
-           border: 1px solid var(--accent); background: var(--accent); color: #fff; }
+  label small { display: block; font-weight: 400; color: var(--muted); font-size: .8rem; }
+  input, select {
+    width: 100%; margin-top: 5px; padding: 9px 11px; font: inherit; color: var(--ink);
+    background: #fff; border: 1px solid var(--line); border-radius: 8px;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  input:hover, select:hover { border-color: #b4c8cf; }
+  input:focus-visible, select:focus-visible, button:focus-visible {
+    outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(11, 110, 105, .25);
+  }
+  .invalid { border-color: var(--high) !important; box-shadow: 0 0 0 3px rgba(214, 64, 69, .18); }
+
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
+  button {
+    font: inherit; font-weight: 600; padding: 11px 18px; border-radius: 9px; cursor: pointer;
+    border: 1px solid var(--accent); background: var(--accent); color: #fff;
+    transition: background .15s, transform .1s;
+  }
+  button:hover { background: var(--accent-dark); }
+  button:active { transform: translateY(1px); }
+  button:disabled { opacity: .6; cursor: progress; }
   button.ghost { background: transparent; color: var(--accent); }
-  .result h2 { font: 700 1.2rem Georgia, serif; margin: 0 0 12px; }
-  .empty { color: var(--muted); }
-  .pct { font: 700 3rem/1 Georgia, serif; }
-  .bar { height: 10px; background: var(--line); border-radius: 5px; margin: 12px 0; overflow: hidden; }
-  .bar span { display: block; height: 100%; width: 0; transition: width .4s; }
-  .low { color: var(--low); } .moderate { color: var(--mid); } .high { color: var(--high); }
-  ul { padding-left: 1.1rem; margin: 8px 0 0; }
-  li { margin-bottom: 6px; }
-  .errors { color: var(--high); }
+  button.ghost:hover { background: rgba(11, 110, 105, .08); }
+
+  /* ---- Result ---- */
+  .result { padding: 22px; position: sticky; top: 20px; }
+  @media (max-width: 860px) { .result { position: static; } }
+  .result h2 { font: 700 1.2rem var(--display); margin: 0 0 14px; }
+  .empty { color: var(--muted); text-align: center; padding: 8px 0 4px; }
+  .empty svg { width: 130px; display: block; margin: 0 auto 8px; opacity: .85; }
+  .gauge { width: 100%; max-width: 280px; display: block; margin: 0 auto; }
+  .gauge .track { fill: none; stroke: #e3ecef; stroke-width: 14; stroke-linecap: round; }
+  .gauge .value { fill: none; stroke-width: 14; stroke-linecap: round; stroke-dasharray: 0 100; transition: stroke-dasharray .9s cubic-bezier(.2, .8, .2, 1); }
+  .gauge text { font: 700 38px var(--display); fill: var(--ink); text-anchor: middle; }
+  .gauge .sub { font: 500 12px var(--body); fill: var(--muted); }
+  .verdict { text-align: center; margin: 6px 0 4px; font-weight: 700; font-size: 1.05rem; }
+  .chip { display: inline-block; margin-top: 6px; padding: 2px 12px; border-radius: 999px; font-size: .85rem; font-weight: 600; color: #fff; }
+  .chip.low { background: var(--low); } .chip.moderate { background: var(--mid); } .chip.high { background: var(--high); }
+  .centered { text-align: center; }
+  .result h3 { font: 700 1rem var(--display); margin: 20px 0 8px; }
+  .tips { list-style: none; padding: 0; margin: 0; }
+  .tips li { position: relative; padding: 8px 0 8px 22px; border-top: 1px solid var(--line); font-size: .93rem; }
+  .tips li::before { content: ""; position: absolute; left: 2px; top: 15px; width: 9px; height: 9px; border-radius: 50%; background: var(--accent); }
+  .errors { color: var(--high); margin: 0 0 8px; font-weight: 600; }
+  ul.errlist { margin: 0; padding-left: 1.1rem; color: var(--high); font-size: .93rem; }
+  .note { margin-top: 20px; font-size: .8rem; color: var(--muted); text-align: center; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .trace path { animation: none; stroke-dashoffset: 0; }
+    .gauge .value { transition: none; }
+    html { scroll-behavior: auto; }
+  }
 </style>
 </head>
 <body>
 <main>
-  <h1>Heart disease risk estimator</h1>
-  <p class="lede">Enter the clinical measurements below. The model returns a risk estimate and a few plain-language tips. It is a course project, not medical advice.</p>
+  <header>
+    <h1>Heart disease risk estimator</h1>
+    <p class="lede">Enter your clinical measurements and get a risk estimate with a few plain-language tips. This is a course project, not medical advice.</p>
+    <svg class="trace" viewBox="0 0 1200 64" preserveAspectRatio="none" aria-hidden="true">
+      <path pathLength="1" d="M0 36 H260 l14 -6 l14 6 H340 l10 6 l12 -34 l14 58 l12 -30 H470 l16 -10 l16 10 H760 l14 -6 l14 6 H840 l10 6 l12 -34 l14 58 l12 -30 H970 l16 -10 l16 10 H1200"/>
+    </svg>
+  </header>
 
   <div class="layout">
-    <form id="form" novalidate>
-      <div class="grid" id="fields"></div>
+    <form id="form" class="panel" novalidate>
+      <fieldset>
+        <legend>About you</legend>
+        <div class="grid" id="g-about"></div>
+      </fieldset>
+      <fieldset>
+        <legend>Vitals and blood tests</legend>
+        <div class="grid" id="g-vitals"></div>
+      </fieldset>
+      <fieldset>
+        <legend>Heart tests</legend>
+        <div class="grid" id="g-tests"></div>
+      </fieldset>
       <div class="actions">
-        <button type="submit">Estimate risk</button>
+        <button type="submit" id="go">Estimate risk</button>
         <button type="button" class="ghost" id="ex-low">Fill low-risk example</button>
         <button type="button" class="ghost" id="ex-high">Fill high-risk example</button>
       </div>
     </form>
 
-    <section class="result" aria-live="polite">
-      <h2>Result</h2>
-      <div id="out"><p class="empty">Submit the form to see the estimate.</p></div>
+    <section class="panel result" aria-live="polite">
+      <h2>Your result</h2>
+      <div id="out">
+        <div class="empty">
+          <svg viewBox="0 0 130 60" aria-hidden="true"><path d="M0 34 H36 l6 -4 l6 4 H62 l5 4 l6 -26 l7 44 l6 -22 H108 l5 -6 l5 6 H130" fill="none" stroke="#d64045" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          Submit the form to see the estimate.
+        </div>
+      </div>
+      <p class="note">Educational estimate only. See a doctor for medical advice.</p>
     </section>
   </div>
 </main>
 
 <script>
-// One entry per feature in the README data contract.
+// One entry per feature in the README data contract. `group` decides which section it sits in.
 const FIELDS = [
-  { id: "age", label: "Age", hint: "years, 29-77", min: 29, max: 77, step: 1 },
-  { id: "sex", label: "Sex", options: [[0, "Female"], [1, "Male"]] },
-  { id: "cp", label: "Chest pain type", hint: "code 0-3 as in the dataset", options: [[0, "Type 0"], [1, "Type 1"], [2, "Type 2"], [3, "Type 3"]] },
-  { id: "trestbps", label: "Resting blood pressure", hint: "mm Hg, 80-220", min: 80, max: 220, step: 1 },
-  { id: "chol", label: "Cholesterol", hint: "mg/dl, 100-600", min: 100, max: 600, step: 1 },
-  { id: "fbs", label: "Fasting blood sugar above 120 mg/dl", options: [[0, "No"], [1, "Yes"]] },
-  { id: "restecg", label: "Resting ECG result", hint: "code 0-2", options: [[0, "Result 0"], [1, "Result 1"], [2, "Result 2"]] },
-  { id: "thalach", label: "Maximum heart rate", hint: "beats per minute, 60-220", min: 60, max: 220, step: 1 },
-  { id: "exang", label: "Chest pain during exercise", options: [[0, "No"], [1, "Yes"]] },
-  { id: "oldpeak", label: "ST depression after exercise", hint: "0.0-7.0", min: 0, max: 7, step: 0.1 },
-  { id: "slope", label: "Peak exercise ST slope", hint: "code 0-2", options: [[0, "Slope 0"], [1, "Slope 1"], [2, "Slope 2"]] },
-  { id: "ca", label: "Major vessels coloured", hint: "0-4", min: 0, max: 4, step: 1 },
-  { id: "thal", label: "Thalassemia result", hint: "code 0-3", options: [[0, "Result 0"], [1, "Result 1"], [2, "Result 2"], [3, "Result 3"]] },
+  { id: "age", group: "about", label: "Age", hint: "years, 29–77", min: 29, max: 77, step: 1 },
+  { id: "sex", group: "about", label: "Sex", options: [[0, "Female"], [1, "Male"]] },
+  { id: "trestbps", group: "vitals", label: "Resting blood pressure", hint: "mm Hg, 80–220", min: 80, max: 220, step: 1 },
+  { id: "chol", group: "vitals", label: "Cholesterol", hint: "mg/dl, 100–600", min: 100, max: 600, step: 1 },
+  { id: "fbs", group: "vitals", label: "Fasting blood sugar above 120 mg/dl", options: [[0, "No"], [1, "Yes"]] },
+  { id: "thalach", group: "vitals", label: "Maximum heart rate", hint: "beats per minute, 60–220", min: 60, max: 220, step: 1 },
+  { id: "cp", group: "tests", label: "Chest pain type", hint: "code 0–3 as in the dataset", options: [[0, "Type 0"], [1, "Type 1"], [2, "Type 2"], [3, "Type 3"]] },
+  { id: "exang", group: "tests", label: "Chest pain during exercise", options: [[0, "No"], [1, "Yes"]] },
+  { id: "restecg", group: "tests", label: "Resting ECG result", hint: "code 0–2", options: [[0, "Result 0"], [1, "Result 1"], [2, "Result 2"]] },
+  { id: "oldpeak", group: "tests", label: "ST depression after exercise", hint: "0.0–7.0", min: 0, max: 7, step: 0.1 },
+  { id: "slope", group: "tests", label: "Peak exercise ST slope", hint: "code 0–2", options: [[0, "Slope 0"], [1, "Slope 1"], [2, "Slope 2"]] },
+  { id: "ca", group: "tests", label: "Major vessels coloured", hint: "0–4", min: 0, max: 4, step: 1 },
+  { id: "thal", group: "tests", label: "Thalassemia result", hint: "code 0–3", options: [[0, "Result 0"], [1, "Result 1"], [2, "Result 2"], [3, "Result 3"]] },
 ];
 const LOW = { age: 41, sex: 0, cp: 2, trestbps: 125, chol: 190, fbs: 0, restecg: 1, thalach: 178, exang: 0, oldpeak: 0, slope: 2, ca: 0, thal: 2 };
 const HIGH = { age: 67, sex: 1, cp: 0, trestbps: 160, chol: 290, fbs: 1, restecg: 0, thalach: 105, exang: 1, oldpeak: 3, slope: 1, ca: 3, thal: 3 };
+const LABELS = Object.fromEntries(FIELDS.map(f => [f.id, f.label]));
 
-const fieldsEl = document.getElementById("fields");
 for (const f of FIELDS) {
   const wrap = document.createElement("label");
   wrap.htmlFor = f.id;
@@ -97,44 +203,76 @@ for (const f of FIELDS) {
   }
   el.id = f.id; el.name = f.id;
   wrap.appendChild(el);
-  fieldsEl.appendChild(wrap);
+  document.getElementById("g-" + f.group).appendChild(wrap);
 }
 
-function fill(values) { for (const [k, v] of Object.entries(values)) document.getElementById(k).value = v; }
+const clearInvalid = () => document.querySelectorAll(".invalid").forEach(e => e.classList.remove("invalid"));
+function fill(values) {
+  clearInvalid();
+  for (const [k, v] of Object.entries(values)) document.getElementById(k).value = v;
+}
 document.getElementById("ex-low").onclick = () => fill(LOW);
 document.getElementById("ex-high").onclick = () => fill(HIGH);
 fill(LOW);
 
 const out = document.getElementById("out");
-const esc = s => String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+const go = document.getElementById("go");
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const COLOURS = { low: "var(--low)", moderate: "var(--mid)", high: "var(--high)" };
+
+function showResult(data) {
+  const pct = Math.round(data.risk_probability * 100);
+  out.innerHTML = `
+    <svg class="gauge" viewBox="0 0 200 120" role="img" aria-label="Risk ${pct} percent">
+      <path class="track" pathLength="100" d="M20 105 A80 80 0 0 1 180 105"/>
+      <path class="value" id="arc" pathLength="100" d="M20 105 A80 80 0 0 1 180 105" stroke="${COLOURS[data.risk_level]}"/>
+      <text x="100" y="92">${pct}%</text>
+      <text class="sub" x="100" y="112">estimated risk</text>
+    </svg>
+    <div class="centered">
+      <div class="verdict">${esc(data.label)}</div>
+      <span class="chip ${esc(data.risk_level)}">${esc(data.risk_level)} risk</span>
+    </div>
+    <h3>Tips for you</h3>
+    <ul class="tips">${data.tips.map(t => `<li>${esc(t)}</li>`).join("")}</ul>`;
+  // animate the arc from empty to the value
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    document.getElementById("arc").style.strokeDasharray = `${pct} 100`;
+  }));
+  if (window.matchMedia("(max-width: 860px)").matches) out.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+function showErrors(detail) {
+  clearInvalid();
+  const items = detail.map(d => {
+    const id = d.loc[d.loc.length - 1];
+    const el = document.getElementById(id);
+    if (el) el.classList.add("invalid");
+    return `<li>${esc(LABELS[id] || id)}: ${esc(d.msg)}</li>`;
+  }).join("");
+  out.innerHTML = `<p class="errors">Some values are not allowed (HTTP 422)</p><ul class="errlist">${items}</ul>`;
+}
 
 document.getElementById("form").addEventListener("submit", async (e) => {
   e.preventDefault();
+  clearInvalid();
   const payload = {};
   for (const f of FIELDS) {
     const raw = document.getElementById(f.id).value;
     payload[f.id] = raw === "" ? null : Number(raw);
   }
-  out.innerHTML = '<p class="empty">Working...</p>';
+  go.disabled = true; go.textContent = "Estimating…";
+  out.innerHTML = '<p class="empty">Working…</p>';
   try {
     const res = await fetch("/predict", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
     const data = await res.json();
-    if (res.status === 422) {
-      const items = data.detail.map(d => `<li>${esc(d.loc.slice(1).join("."))}: ${esc(d.msg)}</li>`).join("");
-      out.innerHTML = `<p class="errors">Some values are not allowed:</p><ul class="errors">${items}</ul>`;
-    } else if (!res.ok) {
-      out.innerHTML = `<p class="errors">${esc(data.detail || "Something went wrong.")}</p>`;
-    } else {
-      const pct = Math.round(data.risk_probability * 100);
-      const colour = { low: "var(--low)", moderate: "var(--mid)", high: "var(--high)" }[data.risk_level];
-      out.innerHTML = `
-        <div class="pct ${data.risk_level}">${pct}%</div>
-        <div class="bar"><span style="width:${pct}%;background:${colour}"></span></div>
-        <p><strong>${esc(data.label)}</strong> (${esc(data.risk_level)} risk)</p>
-        <h3>Tips</h3><ul>${data.tips.map(t => `<li>${esc(t)}</li>`).join("")}</ul>`;
-    }
+    if (res.status === 422) showErrors(data.detail);
+    else if (!res.ok) out.innerHTML = `<p class="errors">${esc(data.detail || "Something went wrong.")}</p>`;
+    else showResult(data);
   } catch (err) {
     out.innerHTML = '<p class="errors">Could not reach the server.</p>';
+  } finally {
+    go.disabled = false; go.textContent = "Estimate risk";
   }
 });
 </script>
