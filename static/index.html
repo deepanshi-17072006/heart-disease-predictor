@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Heart disease risk estimator</title>
+<style>
+  :root {
+    --paper: #f4f7f8; --ink: #14213d; --muted: #5b6b7c; --line: #d3dde3;
+    --card: #ffffff; --accent: #0b6e69; --low: #2f855a; --mid: #b7791f; --high: #c53030;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink);
+         font: 16px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  main { max-width: 980px; margin: 0 auto; padding: 32px 20px 56px; }
+  h1 { font: 700 2rem/1.2 Georgia, "Iowan Old Style", serif; margin: 0 0 6px; }
+  .lede { color: var(--muted); margin: 0 0 28px; max-width: 60ch; }
+  .layout { display: grid; grid-template-columns: 1.4fr 1fr; gap: 24px; align-items: start; }
+  @media (max-width: 800px) { .layout { grid-template-columns: 1fr; } }
+  form, .result { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 20px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; }
+  @media (max-width: 480px) { .grid { grid-template-columns: 1fr; } }
+  label { display: block; font-weight: 600; font-size: .9rem; }
+  label small { display: block; font-weight: 400; color: var(--muted); }
+  input, select { width: 100%; margin-top: 4px; padding: 8px 10px; font: inherit;
+                  border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink); }
+  input:focus-visible, select:focus-visible, button:focus-visible { outline: 3px solid #8ccfca; outline-offset: 1px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }
+  button { font: inherit; font-weight: 600; padding: 10px 16px; border-radius: 6px; cursor: pointer;
+           border: 1px solid var(--accent); background: var(--accent); color: #fff; }
+  button.ghost { background: transparent; color: var(--accent); }
+  .result h2 { font: 700 1.2rem Georgia, serif; margin: 0 0 12px; }
+  .empty { color: var(--muted); }
+  .pct { font: 700 3rem/1 Georgia, serif; }
+  .bar { height: 10px; background: var(--line); border-radius: 5px; margin: 12px 0; overflow: hidden; }
+  .bar span { display: block; height: 100%; width: 0; transition: width .4s; }
+  .low { color: var(--low); } .moderate { color: var(--mid); } .high { color: var(--high); }
+  ul { padding-left: 1.1rem; margin: 8px 0 0; }
+  li { margin-bottom: 6px; }
+  .errors { color: var(--high); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Heart disease risk estimator</h1>
+  <p class="lede">Enter the clinical measurements below. The model returns a risk estimate and a few plain-language tips. It is a course project, not medical advice.</p>
+
+  <div class="layout">
+    <form id="form" novalidate>
+      <div class="grid" id="fields"></div>
+      <div class="actions">
+        <button type="submit">Estimate risk</button>
+        <button type="button" class="ghost" id="ex-low">Fill low-risk example</button>
+        <button type="button" class="ghost" id="ex-high">Fill high-risk example</button>
+      </div>
+    </form>
+
+    <section class="result" aria-live="polite">
+      <h2>Result</h2>
+      <div id="out"><p class="empty">Submit the form to see the estimate.</p></div>
+    </section>
+  </div>
+</main>
+
+<script>
+// One entry per feature in the README data contract.
+const FIELDS = [
+  { id: "age", label: "Age", hint: "years, 29-77", min: 29, max: 77, step: 1 },
+  { id: "sex", label: "Sex", options: [[0, "Female"], [1, "Male"]] },
+  { id: "cp", label: "Chest pain type", hint: "code 0-3 as in the dataset", options: [[0, "Type 0"], [1, "Type 1"], [2, "Type 2"], [3, "Type 3"]] },
+  { id: "trestbps", label: "Resting blood pressure", hint: "mm Hg, 80-220", min: 80, max: 220, step: 1 },
+  { id: "chol", label: "Cholesterol", hint: "mg/dl, 100-600", min: 100, max: 600, step: 1 },
+  { id: "fbs", label: "Fasting blood sugar above 120 mg/dl", options: [[0, "No"], [1, "Yes"]] },
+  { id: "restecg", label: "Resting ECG result", hint: "code 0-2", options: [[0, "Result 0"], [1, "Result 1"], [2, "Result 2"]] },
+  { id: "thalach", label: "Maximum heart rate", hint: "beats per minute, 60-220", min: 60, max: 220, step: 1 },
+  { id: "exang", label: "Chest pain during exercise", options: [[0, "No"], [1, "Yes"]] },
+  { id: "oldpeak", label: "ST depression after exercise", hint: "0.0-7.0", min: 0, max: 7, step: 0.1 },
+  { id: "slope", label: "Peak exercise ST slope", hint: "code 0-2", options: [[0, "Slope 0"], [1, "Slope 1"], [2, "Slope 2"]] },
+  { id: "ca", label: "Major vessels coloured", hint: "0-4", min: 0, max: 4, step: 1 },
+  { id: "thal", label: "Thalassemia result", hint: "code 0-3", options: [[0, "Result 0"], [1, "Result 1"], [2, "Result 2"], [3, "Result 3"]] },
+];
+const LOW = { age: 41, sex: 0, cp: 2, trestbps: 125, chol: 190, fbs: 0, restecg: 1, thalach: 178, exang: 0, oldpeak: 0, slope: 2, ca: 0, thal: 2 };
+const HIGH = { age: 67, sex: 1, cp: 0, trestbps: 160, chol: 290, fbs: 1, restecg: 0, thalach: 105, exang: 1, oldpeak: 3, slope: 1, ca: 3, thal: 3 };
+
+const fieldsEl = document.getElementById("fields");
+for (const f of FIELDS) {
+  const wrap = document.createElement("label");
+  wrap.htmlFor = f.id;
+  wrap.innerHTML = f.label + (f.hint ? `<small>${f.hint}</small>` : "");
+  let el;
+  if (f.options) {
+    el = document.createElement("select");
+    el.innerHTML = f.options.map(([v, t]) => `<option value="${v}">${t}</option>`).join("");
+  } else {
+    el = document.createElement("input");
+    el.type = "number"; el.min = f.min; el.max = f.max; el.step = f.step; el.required = true;
+  }
+  el.id = f.id; el.name = f.id;
+  wrap.appendChild(el);
+  fieldsEl.appendChild(wrap);
+}
+
+function fill(values) { for (const [k, v] of Object.entries(values)) document.getElementById(k).value = v; }
+document.getElementById("ex-low").onclick = () => fill(LOW);
+document.getElementById("ex-high").onclick = () => fill(HIGH);
+fill(LOW);
+
+const out = document.getElementById("out");
+const esc = s => String(s).replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c]));
+
+document.getElementById("form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const payload = {};
+  for (const f of FIELDS) {
+    const raw = document.getElementById(f.id).value;
+    payload[f.id] = raw === "" ? null : Number(raw);
+  }
+  out.innerHTML = '<p class="empty">Working...</p>';
+  try {
+    const res = await fetch("/predict", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+    const data = await res.json();
+    if (res.status === 422) {
+      const items = data.detail.map(d => `<li>${esc(d.loc.slice(1).join("."))}: ${esc(d.msg)}</li>`).join("");
+      out.innerHTML = `<p class="errors">Some values are not allowed:</p><ul class="errors">${items}</ul>`;
+    } else if (!res.ok) {
+      out.innerHTML = `<p class="errors">${esc(data.detail || "Something went wrong.")}</p>`;
+    } else {
+      const pct = Math.round(data.risk_probability * 100);
+      const colour = { low: "var(--low)", moderate: "var(--mid)", high: "var(--high)" }[data.risk_level];
+      out.innerHTML = `
+        <div class="pct ${data.risk_level}">${pct}%</div>
+        <div class="bar"><span style="width:${pct}%;background:${colour}"></span></div>
+        <p><strong>${esc(data.label)}</strong> (${esc(data.risk_level)} risk)</p>
+        <h3>Tips</h3><ul>${data.tips.map(t => `<li>${esc(t)}</li>`).join("")}</ul>`;
+    }
+  } catch (err) {
+    out.innerHTML = '<p class="errors">Could not reach the server.</p>';
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  build-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Train baseline model
+        run: python train.py --model logreg --C 1.0 --force_save
+
+      - name: Run tests
+        run: pytest -v --tb=short
+
+      - name: Build Docker image
+        run: docker build -t heart-disease-predictor .
