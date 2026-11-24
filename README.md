@@ -84,7 +84,7 @@ UI, `/docs`, MLflow UI (3+ runs), `pytest -v` output, green CI check on the late
 
 | Name | Roll no. | Contribution |
 |---|---|---|
-| Deepanshi | 24csu328 | `<fill in>` |
-| Baani | 24csu349 | `<fill in>` |
+| Deepanshi | 24csu328 | |
+| Baani | 24csu349 ||
 
-Section: `<fill in>`
+Section: `<CA>`
