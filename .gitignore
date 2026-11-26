@@ -6,3 +6,4 @@ mlruns/
 .pytest_cache/
 .env
 logs/*.jsonl
+mlflow.db

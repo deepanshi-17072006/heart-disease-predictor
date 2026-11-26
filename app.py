@@ -37,6 +37,7 @@ def _load_model():
         return model, meta
     except Exception:  # missing or incompatible file: the API still starts, /predict answers 503
         logger.exception("Could not load model from %s", MODEL_PATH)
+        print(f"[heart-api] ERROR: could not load model from {MODEL_PATH}. See traceback above.", flush=True)
         return None, {}
 
 
